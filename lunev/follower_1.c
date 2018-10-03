@@ -12,6 +12,7 @@
 
 const int Amount_of_param = 1;
 
+const int Pipe_len = 15;
 int Err_code = 0;
 
 int pipe_worker(char *my_pipe_name);
@@ -25,8 +26,10 @@ int main( int argc, char** argv)
 	char pipe_name[100] = {};
 
 	pipe_catcher(pipe_name);
+	printf(">>> Start read from %s\n", pipe_name);
 
 	pipe_worker(pipe_name);
+	printf(">>> End read from %s\n", pipe_name);
 
 	return 0;
 }
@@ -35,11 +38,15 @@ void pipe_catcher(char *my_pipe_name)
 {
 	char size = 0;
 	int pfdw = 0;
-	if((pfdw = open("pipe_for_pid", O_RDONLY, 0644)) && pfdw == -1)
-		assert(1 == 0 && "ERR Can't open pipe_checker2 for write!");
+	if((pfdw = open("pipe_for_pid", O_RDONLY | O_APPEND, 0644)) && pfdw == -1)
+		assert(1 == 0 && "ERR Can't open pipe_for_pid for write!");
 
-	assert(read(pfdw, &size, 1) == 1 && "ERROR - I can't read size of current pipe name!");
-	assert(read(pfdw, my_pipe_name, size) == size && "ERROR - I can't read current pipe name!");
+// critical section start
+//	assert(read(pfdw, &size, 1) == 1 && "ERROR - I can't read size of current pipe name!");
+	assert(read(pfdw, my_pipe_name, Pipe_len) == Pipe_len && "ERROR - I can't read current pipe information! (maby two streamers & one follower)");
+
+	printf("@ 2 @ Read pid \"%s\"\n", my_pipe_name);
+// critical section end
 
 	close(pfdw);
 }
@@ -53,7 +60,6 @@ int pipe_worker(char *my_pipe_name)
 	assert(pfd != -1 && "ERROR Maby you turn on stream???");
 
 	int num_of_get = 0;
-	//close(pipefd[1]);
 
 	while((num_of_get = read(pfd, &buffer, c_buff_size)) && num_of_get > 0)
 	{
