@@ -15,7 +15,7 @@ const int Amount_of_param = 2;
 
 int Err_code = 0;
 
-void is_stream_going(void);
+int is_stream_going(void);
 int pipe_worker(char *file_name);
 
 int main( int argc, char** argv)
@@ -23,44 +23,57 @@ int main( int argc, char** argv)
 	if(argc != Amount_of_param)
 		assert(0 && "ERROR - Invalid amount of args!");
 
+	int pfdw = 0;
 	char* name = argv[1];
 	pid_t parent_pid = 0;
 
 //
-//	printf("1\n");
-//	is_stream_going();
-//	printf("2\n");
+	printf("> Can I stream?\n");
+	int need_write = is_stream_going();
+	printf("> Yes, I can!\n");
 
 	if(Err_code == 0)
 		Err_code = pipe_worker(name);
 
+	if(need_write == 1)
+	{
+		printf("\n ----> ----> ----> IN WRITER <---- <---- <---- \n");
+		if((pfdw = open("pipe_checker2", O_WRONLY, 0644)) && pfdw == -1)
+			assert(1 == 0 && "ERR Can't open pipe_checker for write!");
+		write(pfdw, "W", 1);
+		close(pfdw);
+	}
 //
 
 	return 0;
 }
 
-void is_stream_going(void)
+int is_stream_going(void)
 {
+	int pfdr = 0;
+	char num[2] = {};
+	int num_of_read = -1;
 
-	int pfdw = open("pipe_checker", O_RDWR, 0644);
-	//int pfdr = open("pipe_checker", O_RDONLY, 0644);
-	char num[1] = {};
-	int num_of_read = 0;
-	//write(pfdw, "", 1);
+	if((pfdr = open("pipe_checker2", O_RDONLY, 0644)) && pfdr == -1)
+		assert(1 == 0 && "ERR Can't open pipe_checker for read!");
 
-	while((num_of_read = read(pfdw, &num, 1)) && num_of_read > 0)
-	{
-		printf("readed = %d, %s\n", num_of_read, num);
-		write(pfdw, "R", 1);
-	}
+	num_of_read = read(pfdr, &num, 2);
+	close(pfdr);
 
-	close(pfdw);
-	//close(pfdr);
+	if(num_of_read == 0)
+		is_stream_going();
+	else if(num_of_read == 2)
+		return 1;
+
+	return 0;		
 }
 
 int pipe_worker(char *file_name)
 {
-	int pfdw = open("pipe_checker", O_WRONLY, 0644);
+	int pfdw = 0;
+	if((pfdw = open("pipe_checker", O_WRONLY, 0644)) && pfdw == -1)
+		assert(1 == 0 && "ERR Can't open pipe_checker2 for write!");
+
 	write(pfdw, "R", 1);	
 	close(pfdw);
 
@@ -81,10 +94,6 @@ int pipe_worker(char *file_name)
 		//
 	}
 
-	//pfdw = open("pipe_checker", O_RDONLY, 0644);
-	//read(pfdw, &num, 1);
-
-	//close(pfdw);
 	close(ifd);
 	close(pfd);
 

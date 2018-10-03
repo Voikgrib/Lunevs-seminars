@@ -15,54 +15,91 @@ const int Amount_of_param = 2;
 int Err_code = 0;
 
 int pipe_worker(char *pipe_name);
-void is_stream_going(void);
+int is_stream_going(void);
 
 int main( int argc, char** argv)
 {
+	int pfdr = 0;
+	int pfdw = 0;
+	int num_of_get = 0;
+	char num[2] = {};
+
 	if(argc != Amount_of_param)
 		assert(0 && "ERROR - Invalid amount of args!");
 
 	char* name = argv[1];
 	pid_t parent_pid = 0;
 
-
-//
-	printf("1\n");
-	is_stream_going();
-	printf("2\n");
+	printf("> Wait for alone streamer...\n");
+	//if((pfdr = open("pipe_checker2", O_RDONLY, 0644)) && pfdr == -1)
+	//	assert(1 == 0 && "ERR Can't open pipe_checker2 for read!");
+	if((pfdw = open("pipe_checker2", O_WRONLY, 0644)) && pfdw == -1)
+		assert(1 == 0 && "ERR Can't open pipe_checker2 for write!");
+	//while(num_of_get != 1)
+	//{
+	write(pfdw, "W", 1);
+	//num_of_get = read(pfdr, &num, 2);
+	//	if(num_of_get == 2)
+	//		write(pfdw, " ", 1);		
+	//}
+	close(pfdw);
+	printf("> Printed in pipechecker2");
+	//close(pfdr);
+	int need_write = is_stream_going();
+	printf("> Streamer find!\n");
 
 	if(Err_code == 0)
 		Err_code = pipe_worker(name);
 
+/*	if(need_write == 1)
+	{
+		if((pfdw = open("pipe_checker", O_WRONLY, 0644)) && pfdw == -1)
+			assert(1 == 0 && "ERR Can't open pipe_checker for write!");
+		write(pfdw, "W", 1);
+		close(pfdw);
+	}
+*/
 //
 
 	return 0;
 }
 
-void is_stream_going(void)
+int is_stream_going(void)
 {
-	int pfdr = open("pipe_checker", O_RDONLY, 0644);
+	int pfdr = 0;
 	char num[1] = {};
 	int num_of_read = -1;
-	//write(pfdw, " ", 1);
 
-	
+	if((pfdr = open("pipe_checker", O_RDONLY, 0644)) && pfdr == -1)
+		assert(1 == 0 && "ERR Can't open pipe_checker for read!");
+
 	num_of_read = read(pfdr, &num, 1);
 	close(pfdr);
 
 	if(num_of_read == 0)
 		is_stream_going();
+	else if(num_of_read == 2)
+	{
+		printf("!!! Its strange");
+		return 1;
+	}
 
-	//while((num_of_read = read(pfdr, &num, 1)) && num_of_read == 0);
-
-	//while((num_of_read = read(pfdw, &num, 1)) && num_of_read == 0);
-
-	//int pfdw = open("pipe_checker", O_WRONLY, 0644);
-	//num_of_read = read(pfdw, &num, 1);
-
-
-	//close(pfdw);
+	return 0;		
 }
+
+/*
+{
+	int pfdr = open("pipe_checker", O_RDONLY, 0644);
+	char num[1] = {};
+	int num_of_read = -1;
+
+	num_of_read = read(pfdr, &num, 1);
+	close(pfdr);
+
+	if(num_of_read == 0)
+		is_stream_going();
+}
+*/
 
 int pipe_worker(char *pipe_name)
 {
