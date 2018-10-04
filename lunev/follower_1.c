@@ -38,13 +38,17 @@ void pipe_catcher(char *my_pipe_name)
 {
 	char size = 0;
 	int pfdw = 0;
+	int num_of_read = 0;
 	if((pfdw = open("pipe_for_pid", O_RDONLY | O_APPEND, 0644)) && pfdw == -1)
 		assert(1 == 0 && "ERR Can't open pipe_for_pid for write!");
 
 // critical section start
-//	assert(read(pfdw, &size, 1) == 1 && "ERROR - I can't read size of current pipe name!");
-	assert(read(pfdw, my_pipe_name, Pipe_len) == Pipe_len && "ERROR - I can't read current pipe information! (maby two streamers & one follower)");
-
+//	assert(read(pfdw, my_pipe_name, Pipe_len) == Pipe_len && "ERROR - I can't read current pipe information! (maby two streamers & one follower)");
+	while(num_of_read == 0)
+	{
+		num_of_read = read(pfdw, my_pipe_name, Pipe_len);
+		assert((num_of_read == 0 || num_of_read == Pipe_len) && "ERROR - Bad opening ");
+	}
 	printf("@ 2 @ Read pid \"%s\"\n", my_pipe_name);
 // critical section end
 
