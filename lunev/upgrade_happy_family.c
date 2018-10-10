@@ -44,10 +44,7 @@ int main( int argc, char** argv)
 
 	int num = get_num_function(argv[1]);
 	pid_t parent_pid = getpid();
-//	pid_t cur_pid = 0;
 	int cur_i = 0;
-//	printf(">>> Parent pid = %d\n", parent_pid);
-
 
 	int msg_id = msgget(IPC_PRIVATE, (IPC_CREAT | 0644));
 
@@ -62,18 +59,13 @@ int main( int argc, char** argv)
 		cur_i = process_creator(num, msg_id);
 //
 
-//	printf(">>> Cur pid = %d\n", getpid());
-
 	if(Err_code == 0 && parent_pid != getpid())
 		child_happy_printer(msg_id, cur_i);
 
 	if(parent_pid == getpid())
 	{
-//		printf(">>> I am wait in msg killer\n");
 		wait(NULL);
-//		printf(">>> I am in msg killer\n");
 		msgctl(msg_id, IPC_RMID, NULL);
-//		printf(">>> I killed msg already\n");
 	}
 
 	err_worker();
@@ -88,9 +80,9 @@ void child_happy_printer(int id, int cur_i)
 	size_t size = msgrcv(id, &my_msg, Msg_len, cur_i, NULL);
 
 	if(size != -1 && size < 11)
-		printf("> I am %d child with pid = %d, when i born i said \"%s\"\n", cur_i, getpid(), my_msg.payload);
+		printf("> I am %d\t child with pid = %d, when i born i said \"%s\"\n", cur_i, getpid(), my_msg.payload);
 	else
-		printf("> I am %d child with pid = %d and i have error T_T\n", cur_i, getpid());
+		printf("> I am %d\t child with pid = %d and i have error T_T\n", cur_i, getpid());
 }
 
 int process_creator(int num, int msg_id)
@@ -103,19 +95,15 @@ int process_creator(int num, int msg_id)
 
 	num++;
 	int i = 0;
-	//pid_t cur_pid = -1;
 	pid_t parent_pid = getpid();
 
-	while(i != num)
+	while(1 == 1)
 	{
 		if(parent_pid == getppid())
 		{
-			//born & message send here
 			struct msg my_msg;
 			my_msg.mtype = i;
 			size_t size = sprintf(my_msg.payload, "%d-%d\0", i ,getpid());
-
-			//printf("")
 
 			if(size > 50)
 			{
@@ -123,8 +111,6 @@ int process_creator(int num, int msg_id)
 				printf("Err in write\n");
 				return -1;
 			}
-
-			//printf(">>> i(%d) = \"%s\"\n", i, my_msg.payload);
 
 			if(msgsnd(msg_id, &my_msg, size, NULL) == -1)
 			{
@@ -137,7 +123,6 @@ int process_creator(int num, int msg_id)
 		}
 		else if(i != num - 1)
 		{
-			//printf(">>> I fork %d\n", i);
 			fork();
 			wait(NULL);
 		}
