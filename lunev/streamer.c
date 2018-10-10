@@ -91,7 +91,6 @@ int pipe_worker(char *file_name)
 	while((num_of_read = read(ifd, &buffer, c_buff_size)) && num_of_read > 0)
 	{
 		write(pfd, &buffer, num_of_read);
-		//
 	}
 
 	close(ifd);

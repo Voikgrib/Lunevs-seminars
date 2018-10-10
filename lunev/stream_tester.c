@@ -6,16 +6,22 @@
 
 int main()
 {
-
-	pid_t ppid = fork();
+	pid_t ppid = getpid();
+	pid_t cpid = fork();
 	//pid_t pid = fork();
-	system("./streamer streamer.c");
 	system("./streamer streamer_1.c");
 	//system("./follower pipe2");
 
-	if(ppid != 0)
+	if(cpid != 0)
+	{
+	//	system("./streamer test_text.txt");		
 		wait(NULL);
-
+	}
+	//else
+	//{
+	//	sleep(1);
+	//	kill(cpid, 9);
+	//}
 	//if(pid != 0)
 	//	wait(NULL);
 
