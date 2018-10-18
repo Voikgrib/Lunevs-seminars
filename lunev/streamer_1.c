@@ -1,6 +1,7 @@
 
 #include<stdio.h>
 #include<stdlib.h>
+#include <stdbool.h>
 #include<errno.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -26,7 +27,7 @@ int Err_code = 0;
 const int Pipe_len = 15;
 
 int pipe_thrower(char* my_pid, char size);
-int pipe_worker(char *file_name, char *my_pipe_name);
+int pipe_worker(char *file_name, char* my_pipe_name);
 
 int main( int argc, char** argv)
 {
@@ -44,7 +45,6 @@ int main( int argc, char** argv)
 	pid_t my_pid = getpid();
 
 	char size = sprintf(pipe_name, "%s%d", "pipe_", my_pid);	
-	int i = 0;
 
 	if(size <= 0)
 	{
@@ -64,9 +64,14 @@ int main( int argc, char** argv)
 		perror("Error with makung fifo!\n");
 		return -1;
 	}
-	
+
+//	fcntl(pfd, F_SETFD, (fcntl(pfd, F_GETFD, NULL) ^ O_NONBLOCK));
+	//int nbpfd = open(pipe_name, O_RDONLY | O_NONBLOCK ,0644);
+	//int pfd = open(pipe_name, O_WRONLY | O_NONBLOCK, 0644);
+	//close(nbpfd);
 
 	int pfdw = pipe_thrower(no_warnings, size);
+
 
 	if(pfdw == -1)
 	{
@@ -74,16 +79,14 @@ int main( int argc, char** argv)
 		return -1;
 	}
 
-	printf(">>> SLEEP \n");
-	sleep(10);
 
-	int error = pipe_worker(name, pipe_name);
-	if(error == -1)
-	{
-		perror("Error in pipe opening!\n");
-		return -1;
-	}
-	else if(error == -2)
+	//printf(">>> SLEEP \n");
+	//sleep(10);
+
+	int error = pipe_worker(name, no_warnings);
+
+
+	if(error == -2)
 	{
 		perror("Error in file opening!\n");
 		return -1;
@@ -114,15 +117,25 @@ int pipe_thrower(char* my_pid, char size)
 }
 
 
-int pipe_worker(char *file_name, char *my_pipe_name)
+int pipe_worker(char *file_name, char* my_pipe_name)
 {
-	int pfd = open(my_pipe_name, O_WRONLY);
+	int pfd = open(my_pipe_name, O_WRONLY, 0644);
+
+//	fcntl(pfd, F_SETFD, (fcntl(pfd, F_GETFD, NULL) ^ O_NONBLOCK));
+	
+	if(pfd == -1)
+	{
+		perror("Error in pipe opening!\n");
+		return -1;
+	}
+
 	int ifd = open(file_name, O_RDONLY);
 
-	if(pfd == -1)
-		return -1;
 	if(ifd == -1)
+	{
+		perror("Error in file opening!\n");
 		return -2;
+	}
 
 	char buffer[16] = {};
 	const int c_buff_size = 16;

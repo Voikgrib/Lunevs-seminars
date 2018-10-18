@@ -10,12 +10,12 @@
 #include <sys/msg.h>
 #include <stdint.h>
 
-const size_t Msg_len = 10;
+const size_t Msg_len = 2;
 
 struct msg
 {
 	long mtype;
-	uint8_t payload[50];
+	int mtext[2];
 };
 
 const int Amount_of_param = 2;
@@ -33,8 +33,9 @@ int get_num_function(char *str);
 int process_creator(int num, int msg_id);
 void err_worker(void);
 void child_happy_printer(int id, int cur_i);
+void waiter(int id, int cur_i, int num);
 
-int main( int argc, char** argv)
+int main(int argc, char** argv)
 {
 	if(argc != Amount_of_param)
 	{
@@ -46,7 +47,7 @@ int main( int argc, char** argv)
 	pid_t parent_pid = getpid();
 	int cur_i = 0;
 
-	int msg_id = msgget(IPC_PRIVATE, (IPC_CREAT | 0644));
+	int msg_id = msgget(IPC_PRIVATE, (IPC_CREAT | 0666));
 
 	if(msg_id == -1)
 		Err_code = Err_in_msg_open;
@@ -59,28 +60,87 @@ int main( int argc, char** argv)
 		cur_i = process_creator(num, msg_id);
 //
 
-	if(Err_code == 0 && parent_pid != getpid())
-		child_happy_printer(msg_id, cur_i);
+//	if(Err_code == 0 && cur_i == 1)
+//		child_happy_printer(msg_id, cur_i);		
+
+/*	
+	while(i != )
+	{
+		
+	}
+*/
+
+	if(Err_code == 0 && parent_pid != getpid() && cur_i > 0 && cur_i != num + 1)
+		waiter(msg_id, cur_i, num);
+//		child_happy_printer(msg_id, cur_i);
 
 	if(parent_pid == getpid())
 	{
-		wait(NULL);
-		msgctl(msg_id, IPC_RMID, NULL);
+		int i = 0;
+
+		while(i != cur_i)
+		{
+			wait(NULL);// error with wait here
+			i++;
+		}
+
+		if(msgctl(msg_id, IPC_RMID, NULL) == -1)
+			perror("Error!!! Can't delete msg!");
+		printf("\n\n");
+
+		err_worker();
 	}
 
-	err_worker();
-
 	return 0;
+}
+
+
+void waiter(int id, int cur_i, int num)
+{
+	struct msg my_msg;
+	size_t size = 0;
+	int i = 0;
+	num++;
+
+	if(cur_i == 1)
+	{
+		while(i != num - 1)
+		{
+			size = msgrcv(id, &my_msg, sizeof(my_msg.mtext), num + 1, MSG_NOERROR);
+
+			if(size != -1)
+				i++;
+
+			if(i == num - 1)
+			{
+				printf("1 ");
+				fflush(stdout);
+			}
+		}
+
+		my_msg.mtype = cur_i;
+		msgsnd(id, (void *) &my_msg, sizeof(my_msg.mtext), NULL);
+	}
+	else
+	{
+		while(msgrcv(id, &my_msg, sizeof(my_msg.mtext), cur_i - 1, MSG_NOERROR) == -1);
+
+		printf(" %d ", cur_i); // Something wrong here
+		fflush(stdout);
+
+		my_msg.mtype = cur_i;
+		msgsnd(id, (void *) &my_msg, sizeof(my_msg.mtext), NULL);
+	}
 }
 
 
 void child_happy_printer(int id, int cur_i)
 {
 	struct msg my_msg;
-	size_t size = msgrcv(id, &my_msg, Msg_len, cur_i, NULL);
+	size_t size = msgrcv(id, &my_msg, sizeof(my_msg.mtext), cur_i, MSG_NOERROR);
 
-	if(size != -1 && size < 11)
-		printf("> I am %d\t child with pid = %d, when i born i said \"%s\"\n", cur_i, getpid(), my_msg.payload);
+	if(size != -1)
+		printf("> %d-%d = \"%d-%d\"\n", cur_i, getpid(), my_msg.mtext[0], my_msg.mtext[1]);
 	else
 		printf("> I am %d\t child with pid = %d and i have error T_T\n", cur_i, getpid());
 }
@@ -94,40 +154,36 @@ int process_creator(int num, int msg_id)
 	}
 
 	num++;
-	int i = 0;
+	long i = 0;
 	pid_t parent_pid = getpid();
+	pid_t cur_pid = -1;
 
-	while(1 == 1)
+	while(i < num)
 	{
-		if(parent_pid == getppid())
+		if(cur_pid == 0) // upgrage happy child
 		{
 			struct msg my_msg;
-			my_msg.mtype = i;
-			size_t size = sprintf(my_msg.payload, "%d-%d\0", i ,getpid());
+			my_msg.mtype = num + 1;
+			my_msg.mtext[0] = i;
+			my_msg.mtext[1] = getpid();
+			size_t size = sizeof(my_msg.mtext);//sizeof(my_msg);//sprintf(my_msg.payload, "%d-%d\0", i ,getpid());
 
-			if(size > 50)
-			{
-				Err_code = Err_in_msgwrite;
-				printf("Err in write\n");
-				return -1;
-			}
+			//printf("! %d: %d = %d\n", msg_id, my_msg.mtext[0], my_msg.mtext[1]);
 
-			if(msgsnd(msg_id, &my_msg, size, NULL) == -1)
+			if(msgsnd(msg_id, (void *) &my_msg, size, NULL) == -1)
 			{
 				Err_code = Err_in_msgsend;
 				printf("Err in msg send\n");
 				return -1;
 			}
 
-			break;
+			return i;
 		}
-		else if(i != num - 1)
+		else// if(parent_pid == getpid() && (i != num - 1)) 		// Roditel 
 		{
-			fork();
-			wait(NULL);
+			cur_pid = fork();
+			//wait(NULL);
 		}
-		else
-			break;
 
 		i++;
 	}
@@ -169,7 +225,7 @@ void err_worker(void)
 	{
 		printf("!!ERR!! Ia ne mogy rogit' ego obratno! (amount of child < 0)\n");
 	}
-	else if(Err_code = Err_in_msg_open)
+	else if(Err_code == Err_in_msg_open)
 	{
 		printf("!!ERR!! Ia ne mogy sozdat ochered'\n");
 	}

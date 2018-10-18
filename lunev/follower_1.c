@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -9,6 +10,8 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <assert.h>
+
+// нет 100% при получении номера пида из пайпа пайп ДОЛЖЕН БЫТЬ ОТКРЫТ СТРИМЕРОМ НА ЧТЕНИЕ
 
 const int Amount_of_param = 1;
 
@@ -73,41 +76,29 @@ int pipe_catcher(char *my_pipe_name)
 int pipe_worker(char *my_pipe_name)
 {
 //	int error_check = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
-//	int nbpfd = open(my_pipe_name, O_NONBLOCK | O_RDONLY, 0644);
+//	int nbpfd = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
+//	int nbpfd = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
+//	sleep(10);
 	int pfd = open(my_pipe_name, O_RDONLY, 0644);
-//	printf("Error = %d\n", error_check);	
-//	close(error_check);
 	char buffer[16] = {};
 	const int c_buff_size = 16;
 
-//	if(fcntl(nbpfd, F_SETFL, fcntl(nbpfd, F_GETFL, 0) | O_NONBLOCK))
-//		return -1;
-
-	if(pfd == -1)// || nbpfd < 0)
+	if(pfd == -1)
 		return -1;
 
 	int num_of_get = 0;
 
-/*	while((num_of_get = read(nbpfd, &buffer, c_buff_size)) && errno == EAGAIN)
-	{
-		if(num_of_get > 0)
-			write(STDOUT_FILENO, &buffer, num_of_get);
-
-		errno = 0;
-		printf("Z...z...z...\n");
-	}
-*/
-//	printf("\n>> 0 << Z...z...z...\n");
-//	write(STDOUT_FILENO, &buffer, num_of_get);
-//	printf("\n>> 1 << Z...z...z...\n");
-	num_of_get = 0;
-
-	while((num_of_get = read(pfd, &buffer, c_buff_size)) && num_of_get > 0)
+	while(num_of_get = read(pfd, &buffer, c_buff_size))// && num_of_get > 0)
 	{
 		write(STDOUT_FILENO, &buffer, num_of_get);
+		//close(pfd);
+		//errno = 0;
+		//pfd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
+
+		//if(errno != 0)
+		//	return -1;
 	}
 
-//	close(nbpfd);
 	close(pfd);
 
 	return 0;
