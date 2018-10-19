@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <assert.h>
+#include <poll.h>
 
 // нет 100% при получении номера пида из пайпа пайп ДОЛЖЕН БЫТЬ ОТКРЫТ СТРИМЕРОМ НА ЧТЕНИЕ
 
@@ -21,6 +22,13 @@ int Err_code = 0;
 int pipe_worker(char *my_pipe_name);
 int pipe_catcher(char *my_pipe_name);
 
+/*struct pollfd
+{
+	int fd;
+	short events;
+	short revents;
+};
+*/
 
 int main( int argc, char** argv)
 {
@@ -51,6 +59,11 @@ int main( int argc, char** argv)
 		perror("Error Maby you turn on stream???\n");
 		return -1;
 	}
+	else if(Err_code == -2)
+	{
+		perror("Error in poll 1???\n");
+		return -1;
+	}
 	
 	return 0;
 }
@@ -75,28 +88,40 @@ int pipe_catcher(char *my_pipe_name)
 
 int pipe_worker(char *my_pipe_name)
 {
-//	int error_check = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
-//	int nbpfd = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
-//	int nbpfd = open(my_pipe_name, O_NONBLOCK | O_WRONLY, 0644);
-//	sleep(10);
-	int pfd = open(my_pipe_name, O_RDONLY, 0644);
-	char buffer[16] = {};
-	const int c_buff_size = 16;
-
+	struct pollfd fds[1];
+	fds[0].fd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
+	fds[0].events = POLLIN;
+	int pfd = fds[0].fd;
 	if(pfd == -1)
 		return -1;
 
+	int ret = poll(fds, 1, -1);
+	int flags = fcntl(pfd , F_GETFD);
+
+	fcntl(pfd , F_SETFD, flags ^ O_NONBLOCK);
+
+	if(ret <= 0|| (fds[0].revents & POLLIN) == 0)
+	{
+		if(pfd > 0)
+			close(pfd);
+
+		if(unlink(my_pipe_name) == -1)
+		{
+			perror("Error with unlink!\n");
+			return -1;
+		}
+
+		perror("Error: My brother dead, sorry, i can't work T_T\n");
+		return -2;
+	}
+
+	char buffer[16] = {};
+	const int c_buff_size = 16;
 	int num_of_get = 0;
 
-	while(num_of_get = read(pfd, &buffer, c_buff_size))// && num_of_get > 0)
+	while(num_of_get = read(pfd, &buffer, c_buff_size))
 	{
 		write(STDOUT_FILENO, &buffer, num_of_get);
-		//close(pfd);
-		//errno = 0;
-		//pfd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
-
-		//if(errno != 0)
-		//	return -1;
 	}
 
 	close(pfd);

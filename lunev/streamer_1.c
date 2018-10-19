@@ -1,19 +1,19 @@
 
-#include<stdio.h>
-#include<stdlib.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <stdbool.h>
-#include<errno.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <signal.h>
-#include<assert.h>
+#include <assert.h>
 
 const int Amount_of_param = 2;
 
-// если фолловер сдохнет после прочтения номера пайпа, то стример повиснет навсегда на моменте открытия пайпа   |-|
+// если фолловер сдохнет после прочтения номера пайпа, то стример повиснет навсегда на моменте открытия пайпа   |+|
 // asserts заменить на возвращение кода ошибки (s)=(+) (f)=(+)  												|+|
 // убивать пайп НЕ через system 																				|+|
 
@@ -65,11 +65,6 @@ int main( int argc, char** argv)
 		return -1;
 	}
 
-//	fcntl(pfd, F_SETFD, (fcntl(pfd, F_GETFD, NULL) ^ O_NONBLOCK));
-	//int nbpfd = open(pipe_name, O_RDONLY | O_NONBLOCK ,0644);
-	//int pfd = open(pipe_name, O_WRONLY | O_NONBLOCK, 0644);
-	//close(nbpfd);
-
 	int pfdw = pipe_thrower(no_warnings, size);
 
 
@@ -78,10 +73,6 @@ int main( int argc, char** argv)
 		perror("Error Can't open pipe_for_pid for write or I can't thow pipe info!\n");
 		return -1;
 	}
-
-
-	//printf(">>> SLEEP \n");
-	//sleep(10);
 
 	int error = pipe_worker(name, no_warnings);
 
@@ -121,8 +112,6 @@ int pipe_worker(char *file_name, char* my_pipe_name)
 {
 	int pfd = open(my_pipe_name, O_WRONLY, 0644);
 
-//	fcntl(pfd, F_SETFD, (fcntl(pfd, F_GETFD, NULL) ^ O_NONBLOCK));
-	
 	if(pfd == -1)
 	{
 		perror("Error in pipe opening!\n");
