@@ -10,10 +10,11 @@
 #include <fcntl.h>
 #include <signal.h>
 #include <assert.h>
+#include <poll.h>
 
 const int Amount_of_param = 2;
 
-// если фолловер сдохнет после прочтения номера пайпа, то стример повиснет навсегда на моменте открытия пайпа   |+|
+// если фолловер сдохнет после прочтения номера пайпа, то стример повиснет навсегда на моменте открытия пайпа   |+|-|
 // asserts заменить на возвращение кода ошибки (s)=(+) (f)=(+)  												|+|
 // убивать пайп НЕ через system 																				|+|
 
@@ -76,27 +77,20 @@ int main( int argc, char** argv)
 
 	int error = pipe_worker(name, no_warnings);
 
-
-	if(error == -2)
+	
+	if(error == -2 || error == -1)
 	{
 		perror("Error in file opening!\n");
 		return -1;
 	}
 
 	close(pfdw);
-
-	if(unlink(pipe_name) == -1)
-	{
-		perror("Error with unlink!\n");
-		return -1;
-	}
-
 	return 0;
 }
 
 int pipe_thrower(char* my_pid, char size)
 {
-	int pfdw =  open("pipe_for_pid", O_WRONLY | O_APPEND, 0644);
+	int pfdw = open("pipe_for_pid", O_WRONLY | O_APPEND, 0644);
 
 	if(pfdw == -1)
 		return -1;
@@ -110,15 +104,54 @@ int pipe_thrower(char* my_pid, char size)
 
 int pipe_worker(char *file_name, char* my_pipe_name)
 {
-	int pfd = open(my_pipe_name, O_WRONLY, 0644);
+	int rfd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
+	int pfd = open(my_pipe_name, O_WRONLY | O_NONBLOCK, 0644);
+	if(pfd == -1)
+	{
+		perror("Error in pipe opening!\n");
+		return -1;
+	}
+	close(rfd);
+
+
+	int flags = fcntl(pfd , F_GETFD);	
+	if(flags != -1)
+		fcntl(pfd , F_SETFD, flags ^ O_NONBLOCK);
+	else 
+	{
+		perror("Error with fcntl!\n");
+		return -1;
+	}
+//
+	struct pollfd fds[1];
+	fds[0].fd = pfd;
+	fds[0].events = POLLOUT;
+	int timeout = 10000;
+	int ret = poll(fds, 1, timeout);
+	timeout = 10;
+
+	//perror("1\n");
+
+
+	if(ret <= 0 || (fds[0].revents & POLLOUT) == 0)
+	{
+		if(pfd > 0)
+			close(pfd);
+
+		if(unlink(my_pipe_name) == -1)
+			perror("Error with unlink!\n");
+
+		perror("Error: My brother dead, sorry, i can't work T_T\n");
+		return -2;
+	}
+//
+	int ifd = open(file_name, O_RDONLY);
 
 	if(pfd == -1)
 	{
 		perror("Error in pipe opening!\n");
 		return -1;
 	}
-
-	int ifd = open(file_name, O_RDONLY);
 
 	if(ifd == -1)
 	{
@@ -133,7 +166,12 @@ int pipe_worker(char *file_name, char* my_pipe_name)
 
 	while((num_of_read = read(ifd, &buffer, c_buff_size)) && num_of_read > 0)
 	{
-		write(pfd, &buffer, num_of_read);
+		ret = poll(fds, 1, timeout);
+
+		if(ret > 0)
+		{
+			write(pfd, &buffer, num_of_read);
+		}
 	}
 
 	close(ifd);

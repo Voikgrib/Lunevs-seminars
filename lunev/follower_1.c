@@ -13,6 +13,7 @@
 #include <poll.h>
 
 // нет 100% при получении номера пида из пайпа пайп ДОЛЖЕН БЫТЬ ОТКРЫТ СТРИМЕРОМ НА ЧТЕНИЕ
+// logic race if follower launch first!
 
 const int Amount_of_param = 1;
 
@@ -61,7 +62,13 @@ int main( int argc, char** argv)
 	}
 	else if(Err_code == -2)
 	{
-		perror("Error in poll 1???\n");
+		perror("Error in poll\n");
+		return -1;
+	}
+
+	if(unlink(pipe_name) == -1)
+	{
+		perror("Error with unlink!\n");
 		return -1;
 	}
 	
@@ -88,28 +95,26 @@ int pipe_catcher(char *my_pipe_name)
 
 int pipe_worker(char *my_pipe_name)
 {
+	/*printf(">>> SLEEP\n");
+	fflush(stdout);
+	sleep(5);*/
+	// if sleep here, error!
 	struct pollfd fds[1];
 	fds[0].fd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
 	fds[0].events = POLLIN;
 	int pfd = fds[0].fd;
+	int timeout = 10000;
 	if(pfd == -1)
 		return -1;
 
-	int ret = poll(fds, 1, -1);
+	int ret = poll(fds, 1, timeout);
 	int flags = fcntl(pfd , F_GETFD);
-
 	fcntl(pfd , F_SETFD, flags ^ O_NONBLOCK);
 
-	if(ret <= 0|| (fds[0].revents & POLLIN) == 0)
+	if(ret <= 0 || (fds[0].revents & POLLIN) == 0)
 	{
 		if(pfd > 0)
 			close(pfd);
-
-		if(unlink(my_pipe_name) == -1)
-		{
-			perror("Error with unlink!\n");
-			return -1;
-		}
 
 		perror("Error: My brother dead, sorry, i can't work T_T\n");
 		return -2;

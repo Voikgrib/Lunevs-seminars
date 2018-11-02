@@ -1,7 +1,7 @@
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -52,27 +52,16 @@ int main(int argc, char** argv)
 	if(msg_id == -1)
 		Err_code = Err_in_msg_open;
 
-	if(Err_code == 0)
-		printf("> Amount of childs %s\n", argv[1]);
+//	if(Err_code == 0)
+//		printf("> Amount of childs %s\n", argv[1]);
 
 //
 	if(Err_code == 0)
 		cur_i = process_creator(num, msg_id);
 //
 
-//	if(Err_code == 0 && cur_i == 1)
-//		child_happy_printer(msg_id, cur_i);		
-
-/*	
-	while(i != )
-	{
-		
-	}
-*/
-
-	if(Err_code == 0 && parent_pid != getpid() && cur_i > 0 && cur_i != num + 1)
+	if(Err_code == 0 && parent_pid != getpid() && cur_i > 0)
 		waiter(msg_id, cur_i, num);
-//		child_happy_printer(msg_id, cur_i);
 
 	if(parent_pid == getpid())
 	{
@@ -80,7 +69,7 @@ int main(int argc, char** argv)
 
 		while(i != cur_i)
 		{
-			wait(NULL);// error with wait here
+			wait(NULL);
 			i++;
 		}
 
@@ -100,11 +89,10 @@ void waiter(int id, int cur_i, int num)
 	struct msg my_msg;
 	size_t size = 0;
 	int i = 0;
-	num++;
 
 	if(cur_i == 1)
 	{
-		while(i != num - 1)
+		while(i != num - 1) // wait all
 		{
 			size = msgrcv(id, &my_msg, sizeof(my_msg.mtext), num + 1, MSG_NOERROR);
 
@@ -123,13 +111,13 @@ void waiter(int id, int cur_i, int num)
 	}
 	else
 	{
-		while(msgrcv(id, &my_msg, sizeof(my_msg.mtext), cur_i - 1, MSG_NOERROR) == -1);
+		while(msgrcv(id, &my_msg, sizeof(my_msg.mtext), cur_i - 1, MSG_NOERROR) == -1); // prologue
 
-		printf(" %d ", cur_i); // Something wrong here
-		fflush(stdout);
+		printf(" %d ", cur_i);													// critical section
+		fflush(stdout);															// critical section
+		my_msg.mtype = cur_i;													// critical section
 
-		my_msg.mtype = cur_i;
-		msgsnd(id, (void *) &my_msg, sizeof(my_msg.mtext), NULL);
+		msgsnd(id, (void *) &my_msg, sizeof(my_msg.mtext), NULL);						// epilogue
 	}
 }
 
@@ -153,7 +141,6 @@ int process_creator(int num, int msg_id)
 		return -1;
 	}
 
-	num++;
 	long i = 0;
 	pid_t parent_pid = getpid();
 	pid_t cur_pid = -1;
@@ -166,9 +153,7 @@ int process_creator(int num, int msg_id)
 			my_msg.mtype = num + 1;
 			my_msg.mtext[0] = i;
 			my_msg.mtext[1] = getpid();
-			size_t size = sizeof(my_msg.mtext);//sizeof(my_msg);//sprintf(my_msg.payload, "%d-%d\0", i ,getpid());
-
-			//printf("! %d: %d = %d\n", msg_id, my_msg.mtext[0], my_msg.mtext[1]);
+			size_t size = sizeof(my_msg.mtext);
 
 			if(msgsnd(msg_id, (void *) &my_msg, size, NULL) == -1)
 			{
@@ -179,10 +164,9 @@ int process_creator(int num, int msg_id)
 
 			return i;
 		}
-		else// if(parent_pid == getpid() && (i != num - 1)) 		// Roditel 
+		else 		// Roditel 
 		{
 			cur_pid = fork();
-			//wait(NULL);
 		}
 
 		i++;
