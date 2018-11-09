@@ -13,8 +13,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 
-int Sig_get = 0;
-int Need_change = 0;
+sig_atomic_t Sig_get = 0;
 unsigned char Cur_letter = 0;
 int Amount_of_param = 2;
 
@@ -36,7 +35,17 @@ int main( int argc, char** argv)
 	char* name = argv[1];
 	int error = copy_worker(name);
 
-	if(error != 0)
+	if(error == -2)
+	{
+		perror("Error in init of parent function!\n");
+		return -1;
+	}
+	else if(error == -1)
+	{
+		perror("Error in init of copy worker function!\n");
+		return -1;
+	}
+	else if(error != 0)
 	{
 		perror("Some error C:\n");
 		return -1;
@@ -53,13 +62,22 @@ int copy_worker(char* file_name)
 	struct sigaction act;
 	memset(&act, 0, sizeof(act));
 	act.sa_sigaction = &sig_c;
-	sigset_t set, oldset; 
-	sigemptyset(&set);
-	sigaddset(&set, SIGUSR1);
-	sigaddset(&set, SIGUSR2);
+	sigset_t set, oldset;
+
+	if(sigemptyset(&set) == -1)
+		return -1;
+	if(sigaddset(&set, SIGUSR1) == -1)
+		return -1;
+	if(sigaddset(&set, SIGUSR2) == -1)
+		return -1;
+
 	act.sa_mask = set;
-	sigaction(SIGUSR1, &act, 0);
-	sigaction(SIGUSR2, &act, 0);
+
+	if(sigaction(SIGUSR1, &act, 0) == -1)
+		return -1;
+	if(sigaction(SIGUSR2, &act, 0) == -1)
+		return -1;
+
 	act.sa_flags = SA_SIGINFO;
 	pid_t child_pid = fork();	
 
@@ -72,10 +90,21 @@ int copy_worker(char* file_name)
 	if(child_pid != 0) 	// Roditel
 	{
 		error = parent_func(child_pid);
+
+		if(error == 0)
+			wait(NULL);
+		else
+			kill(child_pid, SIGKILL);
 	}
 	else				// Rebenok
 	{
 		error = child_func(parent_pid, file_name);
+
+		if(error == -100)
+		{
+			kill(parent_pid, SIGKILL); // I ti Brut!
+			kill(child_pid, SIGKILL);
+		}
 	}
 
 	return error;
@@ -83,17 +112,12 @@ int copy_worker(char* file_name)
 
 int child_func(pid_t parent_pid, char *name)
 {
-	sigset_t set, oldset; 
-	sigemptyset(&set);
-	sigaddset(&set, SIGUSR1);
-	sigaddset(&set, SIGUSR2);
-
 	int ifd = open(name, O_RDONLY | O_NONBLOCK);
 
 	if(ifd < 0)
 	{
 		perror("> ERROR Can't open file!\n");
-		return -1;
+		return -100;
 	}
 	
 	char buffer[16] = {};
@@ -109,17 +133,12 @@ int child_func(pid_t parent_pid, char *name)
 
 		while(bit_num != max_bit * num_of_read)
 		{
-			sigprocmask (SIG_BLOCK, &set, &oldset);
+			while(Sig_get == 0); // wait for signal
 
-			while(Sig_get == 0)
-			{
-				sigsuspend(&oldset);
-			}
-			sigprocmask (SIG_UNBLOCK, &set, NULL);
 			Sig_get = 0;
 
 			if((buffer[bit_num / max_bit] & 0x01) == 1)
-				kill(parent_pid, SIGUSR2); 
+				kill(parent_pid, SIGUSR2);
 			else
 				kill(parent_pid, SIGUSR1);
 			
@@ -138,27 +157,33 @@ int parent_func(pid_t child_pid)
 	char old_letter = 0;
 	int bit_num = 0;
 	int max_bit = 8;
-
+	
 	struct sigaction act;
 	memset(&act, 0, sizeof(act));
 	act.sa_sigaction = &sig_p;
 	sigset_t set, oldset;
-	sigemptyset(&set);
-	sigaddset(&set, SIGUSR1);
-	sigaddset(&set, SIGUSR2);
+	
+	if(sigemptyset(&set) == -1)
+		return -2;
+	if(sigaddset(&set, SIGUSR1) == -1)
+		return -2;
+	if(sigaddset(&set, SIGUSR2) == -1)
+		return -2;
+	if(sigaddset(&set, SIGCHLD) == -1)
+		return -2;
+
 	act.sa_mask = set;
 	act.sa_flags = SA_SIGINFO;
-	sigaction(SIGUSR1, &act, 0);
-	sigaction(SIGUSR2, &act, 0);
-	sigaction(SIGCHLD, &act, 0);
-	bit_num = 0;
-	Cur_letter = 1;
 
-	while(Sig_get == 0)
-	{
-	    kill(child_pid, SIGUSR2);
-		usleep(100);
-	}
+	if(sigaction(SIGUSR1, &act, 0) == -1)
+		return -2;
+	if(sigaction(SIGUSR2, &act, 0) == -1)
+		return -2;
+	if(sigaction(SIGCHLD, &act, 0) == -1)
+		return -2;
+
+	bit_num = 0;
+	Cur_letter = 0;
 
 	bool is_first = true;
 
@@ -166,27 +191,14 @@ int parent_func(pid_t child_pid)
 	{
 		bit_num = 0;
 		cur_byte = 0;
-
 		Cur_letter = 0;
 
 		while(bit_num != max_bit)
 		{
-			Need_change = 0;
+		    kill(child_pid, SIGUSR2);
 
-			if(is_first == true)
-				is_first = false;
-			else
-			{
-				Sig_get = 0;
-			    kill(child_pid, SIGUSR2);
-			}
-
-			sigprocmask(SIG_BLOCK, &set, &oldset);	
-
-			if(Sig_get == 0)
-				sigsuspend(&oldset);
-
-			sigprocmask(SIG_UNBLOCK, &set, NULL);
+			while(Sig_get == 0); // wait for signal
+			Sig_get = 0;		 // no signals here
 
 			bit_num++;
 		}
@@ -205,22 +217,23 @@ static void sig_p(int sig, siginfo_t *siginfo, void *context)
 
 	if(sig == SIGCHLD)
 	{
-		printf(">> Child dead\n");
+		printf(">>> Child dead\n");
 		exit(0);
 	}
 
-	if(sig == SIGUSR2)	
+	if(sig == SIGUSR2)
+	{
 		Cur_letter = (Cur_letter >> 1) | 0x80;
+	}
 	else if(sig == SIGUSR1)
+	{
 		Cur_letter = Cur_letter >> 1;
+	}
 }
 
 static void sig_c(int sig, siginfo_t *siginfo, void *context)
 {
 	Sig_get = 1;
 }
-
-
-
 
 

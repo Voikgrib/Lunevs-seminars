@@ -7,12 +7,10 @@ static void handle_sigint(int sig, siginfo_t *siginfo, void *context)
 { 
     printf(" Sosi pisos 8===D\n"); 
 
-	(int*)context++;
-	printf("i = %d\n", (int*)context);
 	fflush(stdout);
 
-	if(sig == SIGINT)
-		exit(0);
+//	if(sig == SIGINT)
+//		exit(0);
 } 
   
 static void sig_p(int sig, siginfo_t *siginfo, void *context)
@@ -66,4 +64,4 @@ int main()
 
     while (1) ; 
     return 0; 
-} 
+}
