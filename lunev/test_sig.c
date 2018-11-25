@@ -5,20 +5,33 @@
 // Ctrl-C at keyboard 
 static void handle_sigint(int sig, siginfo_t *siginfo, void *context)
 { 
-    printf(" Sosi pisos 8===D\n"); 
+	if(sig == SIGALRM)	
+		printf("ALARM!\n");
 
-	fflush(stdout);
+	sleep(1);
 
-//	if(sig == SIGINT)
-//		exit(0);
+	if(sig == SIGUSR2)	
+		printf(" Sigusr2! %d\n", sig); 
+	if(sig == SIGUSR1)
+		printf(" Sigusr1! %d\n", sig); 
+	if(sig == SIGINT)
+	{
+		printf(" I am dying! \n");
+		exit(0);
+	}
 } 
   
 static void sig_p(int sig, siginfo_t *siginfo, void *context)
 {
+	if(sig == SIGALRM)	
+		printf("ALARM!\n");
+
+	sleep(1);
+
 	if(sig == SIGUSR2)	
-		printf(" Sosi pisos 8===D %d\n", sig); 
+		printf(" Sigusr2! %d\n", sig); 
 	if(sig == SIGUSR1)
-		printf(" Sosi pisos 8===D %d\n", sig); 
+		printf(" Sigusr1! %d\n", sig); 
 	if(sig == SIGINT)
 	{
 		printf(" I am dying! \n");
@@ -40,22 +53,25 @@ int main()
 	sigaddset(&set_2, SIGUSR2);
 	sigaddset(&set, SIGUSR1); 
 	sigaddset(&set, SIGUSR2);
+	sigaddset(&set, SIGALRM);
 	sigaddset(&set, SIGINT);
 	act.sa_mask = set;
 	sigaction(SIGUSR1, &act, 0);
 	sigaction(SIGUSR2, &act, 0);
+	sigaction(SIGALRM, &act, 0);
 	sigaction(SIGINT, &act, 0);
 
 	if(fork() == 0)
 	{
-		sleep(1);
+		//sleep(1);
 		kill(getppid(), SIGUSR1);
-		sleep(1);
-		kill(getppid(), SIGUSR2);
-		sleep(1);
+		//sleep(1);
+		//kill(getppid(), SIGUSR2);
+		//sleep(1);
 	}
 //    signal(SIGINT, handle_sigint); 
 
+	ualarm(100, 0);
 	sigprocmask (SIG_BLOCK, &set_2, &oldset);
 	sigsuspend(&oldset); // ???
 	sigprocmask (SIG_UNBLOCK, &set_2, NULL);

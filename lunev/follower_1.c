@@ -95,9 +95,9 @@ int pipe_catcher(char *my_pipe_name)
 
 int pipe_worker(char *my_pipe_name)
 {
-	/*printf(">>> SLEEP\n");
-	fflush(stdout);
-	sleep(5);*/
+	//printf(">>> SLEEP\n");
+	//fflush(stdout);
+	//sleep(5);
 	// if sleep here, error!
 	struct pollfd fds[1];
 	fds[0].fd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);

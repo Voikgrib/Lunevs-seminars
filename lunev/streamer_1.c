@@ -104,6 +104,9 @@ int pipe_thrower(char* my_pid, char size)
 
 int pipe_worker(char *file_name, char* my_pipe_name)
 {
+	//printf(">>> SLEEP\n");
+	//fflush(stdout);
+	//sleep(5);
 	int rfd = open(my_pipe_name, O_RDONLY | O_NONBLOCK, 0644);
 	int pfd = open(my_pipe_name, O_WRONLY | O_NONBLOCK, 0644);
 	if(pfd == -1)
