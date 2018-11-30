@@ -1,3 +1,8 @@
+// to do
+// Sem to sync send-recive (+)
+// Sem to sync two senders or/and two recivers (+)
+// Sem to evade situation when first reciver doesn't end, but first sender end and so on (+)
+//
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ USING LIBRARYS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 #include <sys/types.h>
@@ -14,7 +19,7 @@
 #include <fcntl.h>
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ DEFINES ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-// semophores cur_sem
+// 
 
 #define MAX_SEMS 	10
 
@@ -37,21 +42,25 @@
 			cur_sem++;									\
 		}
 
-#define SEM_MAKE_OPS(...)										\
-		if(1 == 1)												\
-		{														\
-			if(semop(sem_id, semophores, cur_sem) == -1)		\
-				EXIT_AND_SAY(">>> ERROR: Semop return -1!");	\
-																\
-			cur_sem = 0;										\
+#define SEM_MAKE_OPS(...)																\
+		if(1 == 1)																		\
+		{																				\
+			if(semop(sem_id, semophores, cur_sem) == -1)								\
+				EXIT_AND_SAY(">>> ERROR: Semop return -1! (Maby somebody dead...)");	\
+																						\
+			cur_sem = 0;																\
 		}
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GLOBAL CONSTANTS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
-const int Shared_semaphore = 0xDEADEDB0;
-char *Buffer_pointer = NULL;
+const int Shared_semaphore = 0xDEADEDB1;
 
-enum semnum_t {
+enum semnum_t 
+{
+	SEND_SEM,
+	SEND_SEM_OLD,
+	RECIVE_SEM,
+	RECIVE_SEM_OLD,
 	EMPTY_SEM,
 	MUTEX_SEM,
     AMOUNT_SEM
@@ -101,6 +110,7 @@ int send(void *shm_ptr, int sem_id, const char *name_of_file)
 	int cur_sem = 0;
 	int fd = -1;
 	ssize_t read_amount = 1;
+	int i = 0;
 
 	fd = open(name_of_file, O_RDONLY);
 
@@ -108,24 +118,42 @@ int send(void *shm_ptr, int sem_id, const char *name_of_file)
 		EXIT_AND_SAY(">>> ERROR: File mistery disapiared or never existed (fd = -1)");
 
 	// Sem senders sync
+	SEM_PUSH_OP(RECIVE_SEM_OLD, 0, 0);				// wait death of old reciver
+	SEM_PUSH_OP(SEND_SEM, 0, 0);					// if 0 go
+	SEM_PUSH_OP(SEND_SEM, 1, SEM_UNDO);				// Set sem to 1, return to 0, when process end
+	SEM_MAKE_OPS();
+
+	SEM_PUSH_OP(RECIVE_SEM, -1, 0);
+	SEM_PUSH_OP(RECIVE_SEM, 1, 0);					// Wait for start another prog
+	SEM_PUSH_OP(SEND_SEM_OLD, 1, SEM_UNDO)			// Now sender is old
+	SEM_MAKE_OPS();
 
 	while(read_amount > 0)
 	{
-		// Sem shm sync (+)
+		// Shm sync
 
-        SEM_PUSH_OP(EMPTY_SEM, 0, 0);				// wait(empty == 0)
-        SEM_PUSH_OP(MUTEX_SEM, 0, 0);				// wait(mutex == 0)
-		SEM_PUSH_OP(MUTEX_SEM, 1, SEM_UNDO);		// Mutex++;
+		SEM_PUSH_OP(RECIVE_SEM, -1, IPC_NOWAIT);	// Is another prog alive ?
+		SEM_PUSH_OP(RECIVE_SEM, 1, 0);
+		SEM_MAKE_OPS();
+
+        SEM_PUSH_OP(EMPTY_SEM, 0, 0);				// wait for read ready
+        SEM_PUSH_OP(MUTEX_SEM, 0, 0);				// wait for end of another critical section
+		SEM_PUSH_OP(MUTEX_SEM, 1, SEM_UNDO);		// crit section enter
 		SEM_MAKE_OPS();
 
 		read_amount = read(fd, shm_ptr + sizeof(ssize_t), BUFF_SIZE);
-		write(STDOUT_FILENO, shm_ptr + sizeof(ssize_t), read_amount);
 		*((ssize_t*)shm_ptr) = read_amount;
 
-        SEM_PUSH_OP(EMPTY_SEM, 1, 0);				// Empty++;
-        SEM_PUSH_OP(MUTEX_SEM, -1, SEM_UNDO);		// Mutex--;
+        SEM_PUSH_OP(EMPTY_SEM, 1, 0);				// Send is done
+        SEM_PUSH_OP(MUTEX_SEM, -1, SEM_UNDO);		// crit section exit
         SEM_MAKE_OPS();
 	}
+
+	//SEM_PUSH_OP(SEND_SEM_END, 1, SEM_UNDO);
+	//SEM_PUSH_OP(RECIVE_SEM_END, -1, 0);
+
+	//SEM_PUSH_OP(RECIVE_SEM, 0, 0);
+	//SEM_MAKE_OPS();
 
 	return 0;
 }
@@ -138,30 +166,47 @@ int recive(void *shm_ptr, int sem_id)
 	struct sembuf semophores[MAX_SEMS] = {};
 	int cur_sem = 0;
 	ssize_t read_amount = 1;
+	char clear_massive[BUFF_SIZE] = {};
 
-	// recive sync
+	// recive sync start
 
-    SEM_PUSH_OP(EMPTY_SEM,  1, SEM_UNDO);		// Empty++;
-	SEM_PUSH_OP(EMPTY_SEM, -1, 0);				// Empty--;
+	SEM_PUSH_OP(SEND_SEM_OLD, 0, 0);			// wait death of old sender
+	SEM_PUSH_OP(RECIVE_SEM, 0, 0);				// if 0 go
+	SEM_PUSH_OP(RECIVE_SEM, 1, SEM_UNDO);		// Set sem to 1, return to 0, when process end
+	SEM_MAKE_OPS();
+
+	SEM_PUSH_OP(SEND_SEM, -1, 0);
+	SEM_PUSH_OP(SEND_SEM, 1, 0);					// Wait for start another prog
+	SEM_PUSH_OP(RECIVE_SEM_OLD, 1, SEM_UNDO);		// Now reciver is old
+	SEM_MAKE_OPS();
+
+	// recive sync end
+
+    SEM_PUSH_OP(EMPTY_SEM,  1, SEM_UNDO);		// Set empty to 1, return to 0, when process end
+	SEM_PUSH_OP(EMPTY_SEM, -1, 0);				// Set empty to 0
 	SEM_MAKE_OPS();
 
 	while(read_amount > 0)
 	{
-		//  shm sync (+)
+		//  shm sync
 
-		SEM_PUSH_OP(EMPTY_SEM, -1, 0);			// Empty--;
-        SEM_PUSH_OP(MUTEX_SEM, 0, 0);			// wait(mutex == 0)
-        SEM_PUSH_OP(MUTEX_SEM, 1, SEM_UNDO);	// Mutex++;
+		SEM_PUSH_OP(SEND_SEM, -1, IPC_NOWAIT);	// Is another prog alive ?
+		SEM_PUSH_OP(SEND_SEM, 1, 0);
+		SEM_MAKE_OPS();
+
+		SEM_PUSH_OP(EMPTY_SEM, -1, 0);			// wait for send done
+        SEM_PUSH_OP(MUTEX_SEM, 0, 0);			// wait for end of another critical section
+        SEM_PUSH_OP(MUTEX_SEM, 1, SEM_UNDO);	// critical section enter
 		SEM_MAKE_OPS();
 
 		read_amount = *((ssize_t*)shm_ptr);
  		write(STDOUT_FILENO, shm_ptr + sizeof(ssize_t), read_amount);
 
-        SEM_PUSH_OP(MUTEX_SEM, -1, SEM_UNDO);	// Mutex--;
+        SEM_PUSH_OP(MUTEX_SEM, -1, SEM_UNDO);	// critical section exit
 		SEM_MAKE_OPS();
 	}
 
-	printf("=-=-=-=-=\n");
+
 	return 0;
 }
 
