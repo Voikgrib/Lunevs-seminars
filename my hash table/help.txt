@@ -1,0 +1,51 @@
+
+
+		!============================================!
+		!                                            !
+		!        HELP!       HELP!       HELP!       ! 
+		!                                            !
+		!============================================!
+
+
+> Current build version 0.9.9
+
+
+> Added, but not tested:
+  +--- v 0.9.9
+  +- all implemented
+  |
+  +--- v 0.6.6
+  +- update help
+  +- rework Makefile
+  +- rework Add to hash function
+  +- add search function
+  |
+  +--- v 0.1.3
+  +- some tests
+  |
+  +--- v 0.1.2
+  +- for each element function
+  |
+  +--- v 0.1.0
+  +- my calloc
+  +- hash creator & destructor
+  +- add & delete element
+
+
+> Tested, but i am not sure
+  |
+  +- search
+  +- create & destroy hash
+  +- add & delete in hash
+  +- foreach
+
+
+> Added and tested:
+  |
+  +- All ?
+
+
+> If you find error, please don't touch it.
+
+
+
